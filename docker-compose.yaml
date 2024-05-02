@@ -1,0 +1,11 @@
+services:
+    checkmyraid:
+        image: checkmyraid
+        build:
+            context: .
+            dockerfile: Dockerfile
+        volumes:
+            - /proc/mdstat:/app/data/mdstat:ro
+        env_file:
+            - .env
+        restart: unless-stopped
