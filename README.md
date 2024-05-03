@@ -1,6 +1,6 @@
 # Check My RAID
 
-A simple docker container that checks the status of a RAID array made with mdadm and sends a notification with [NTFY](https://ntfy.sh/) of the status.
+A simple docker container that checks the status of a RAID array made with [mdadm](https://fr.wikipedia.org/wiki/Mdadm) and sends a notification with [NTFY](https://ntfy.sh/) of the status.
 
 ## Usage
 
