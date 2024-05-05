@@ -11,7 +11,11 @@ git clone https://github.com/Remag29/check_my_raid.git
 ```
 
 ```bash
-docker compose up -d --build
+docker compose build
+```
+
+```bash
+docker compose up -d
 ```
 
 ## Docker compose
