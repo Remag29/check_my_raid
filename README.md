@@ -47,10 +47,18 @@ NTFY_TOKEN=changeme
 
 The container is simply a python script that reads the /proc/mdstat to check the status of the RAID array.
 
-Currently, the script is made to check the status of a single RAID array. Work in progress !
+The script is made to check the status of multiple RAID arrays. For example, if you have two RAID arrays md0 and md1, Check My RAID will check the status of both.
 
-The script search the pattern "[UU]", that symbolizes the RAID health. If this pattern change for something like "[_U]", the script sends a notification with NTFY.
+A single notification is sent for all the RAID arrays. The notification contains the detailed status of each RAID array.
 
-The notification sent with NTFY is a simple message with the status of the RAID array. You can specify the URL and the token of your NTFY account with the variables `NTFY_URL` and `NTFY_TOKEN`.
+The script is searching raid arrays with the following regex: 
+```regex
+(\w+) : (\w+) (raid\d+) (.+)\n +(\d+) (.+) \[\d+\/\d+\] \[([U_]+)\]\n + \w+: \d+\/\d+ (.+)
+```
+This regex is made to match with mdstat file format and allows to extract some information like the name of the RAID array, the type of RAID, the status, the number of disks, the status of each disk, and the name of each disk.
+
+The script is checking the status of the RAID array by looking for the beacons `[UU]`. If the status is `[UU]`, the RAID array is considered healthy, but if some "U" are replaced by "_", the RAID array is considered degraded.
+
+The notification sent with NTFY is a simple message with the status of the RAID array and details about disks. You can specify the URL and the token of your NTFY account with the variables `NTFY_URL` and `NTFY_TOKEN`.
 
 The script is scheduled to run every day at a specific time set with the variable `TRIGER_SCHEDULE_AT`.
