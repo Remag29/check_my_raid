@@ -12,6 +12,7 @@ load_dotenv()
 
 # Function ############################################################################
 
+
 def read_mdstat_file(file_path) -> str:
     """Read the content of the mdstat file."""
     try:
@@ -21,15 +22,19 @@ def read_mdstat_file(file_path) -> str:
         print(f"The file {file_path} does not exist.")
         exit(1)
 
-def send_ntfy_notification(url, headers, data, auth) -> None:
-    """Send an HTTP POST request to trigger a notification on NTFY."""
-    response = requests.post(url, headers=headers,
-                             data=data.encode('utf-8'), auth=auth)
-    if response.status_code == 200:
-        print("Notificationn sent successfully.")
+
+def send_discord_notification(url, message_object) -> None:
+    """Send a message to a Discord Webhook."""
+    response = requests.post(url, json=message_object)
+
+    try:
+        response.raise_for_status()
+
+    except requests.exceptions.HTTPError as err:
+        print(err)
     else:
-        print("Échec de l'envoi de la notification.")
-        print(f"Failed to sent request. Status code: {response.status_code}")
+        print(f"Payload delivered successfully, code {response.status_code}.")
+
 
 def get_match(mdstat_content, pattern) -> list:
     """Search for the match in the mdstat file."""
@@ -39,9 +44,14 @@ def get_match(mdstat_content, pattern) -> list:
     else:
         return None
 
-def markdown_factory(matchs) -> str:
-    """Create a markdown message from the match."""
-    message = "# RAID report\n"
+
+def discord_factory(matchs) -> dict:
+    """Create a discord message from the match."""
+    # Create root message object
+    message = {
+        "content": "RAID report",
+        "embeds": []
+    }
 
     for match in matchs:
         # Get the content of the match
@@ -54,23 +64,56 @@ def markdown_factory(matchs) -> str:
             if char == "_":
                 failedDisks.append(disks[index])
 
+        # Create the embed object
+        embed = {}
+
         # Change the message according to the type
         if failedDisks:
-            message += f"## *{mountPoint}* RAID status: KO\n"
-            message += f"> **Failed disks**: {', '.join(failedDisks)}\n"
+            embed["title"] = f"{mountPoint}  :x:"
+            embed["description"] = f"Failed disks: {', '.join(failedDisks)}"
+            embed["color"] = 16063773
         else:
-            message += f"## *{mountPoint}* RAID status: OK\n"
-            message += f"All disks are operational !\n"
+            embed["title"] = f"{mountPoint} RAID status :white_check_mark:"
+            embed["description"] = "All disks are operational !"
+            embed["color"] = 3126294
 
         # Add the informations
-        message += f"### Informations :\n"
-        message += f"- **RAID type**: {raidType}\n"
-        message += f"- **RAID state**: {raidState}\n"
-        message += f"- **Disks list**: {', '.join(disks)}\n"
-        message += f"- **Total**: {total}\n"
-        message += "\n"
-    
+        embed["fields"] = [
+            {
+                "name": "RAID type",
+                "value": raidType,
+                "inline": True
+            },
+            {
+                "name": "RAID state",
+                "value": raidState,
+                "inline": True
+            },
+            {
+                "name": "Disks list",
+                "value": ', '.join(disks),
+                "inline": False
+            },
+            {
+                "name": "Total",
+                "value": total,
+                "inline": False
+            }
+        ]
+
+        # Add footer
+        embed["footer"] = {
+            "text": "CheckMyRaid report"
+        }
+
+        # Add timestamp
+        embed["timestamp"] = datetime.datetime.now().isoformat()
+
+        # Add the embed to the message
+        message["embeds"].append(embed)
+
     return message
+
 
 def is_all_disks_ok(matchs) -> bool:
     """Check if all disks are OK."""
@@ -81,15 +124,15 @@ def is_all_disks_ok(matchs) -> bool:
         # Check if diskState contains "_"
         if "_" in diskState:
             return False
-        
+
     return True
+
 
 def main():
 
     # Variables
     mdstat_file = "/app/data/mdstat"
-    ntfy_url = os.getenv('NTFY_URL')
-    ntfy_token = os.getenv('NTFY_TOKEN')
+    discord_url = os.getenv('DISCORD_WEBHOOK_URL')
 
     # Read the content of the mdstat file
     mdstat_content = read_mdstat_file(mdstat_file)
@@ -103,36 +146,17 @@ def main():
     # Get status of the RAID
     raids_status = is_all_disks_ok(matches)
 
-    # Generate the markdown message
-    markdown = markdown_factory(matches)
+    # Generate the message
+    discord_message = discord_factory(matches)
 
     if raids_status:
         print("RAID status: OK")
-
-        # NTFY notification variable
-        headers = {
-            "Markdown": "yes",
-            "Title": "Check My Raid!",
-            "Priority": "low",
-            "Tags": "white_check_mark,cd"
-        }
-        data = markdown
-        auth = ("", ntfy_token)
-
     else:
         print("RAID status: KO")
-        # NTFY notification variable
-        headers = {
-            "Markdown": "yes",
-            "Title": "Check My Raid!",
-            "Priority": "high",
-            "Tags": "warning,cd"
-        }
-        data = markdown
-        auth = ("", ntfy_token)
 
     # Send the notification
-    send_ntfy_notification(ntfy_url, headers, data, auth)
+    send_discord_notification(discord_url, discord_message)
+
 
 #######################################################################################
 # Start the script 1 time on launch
@@ -146,7 +170,8 @@ trigerAt = os.getenv('TRIGER_SCHEDULE_AT')
 tz = pytz.timezone(timezone)
 now = datetime.datetime.now(tz)
 
-print("Date and time is currently on the timezone", timezone, ":", now.strftime("%Y-%m-%d %H:%M:%S"))
+print("Date and time is currently on the timezone",
+      timezone, ":", now.strftime("%Y-%m-%d %H:%M:%S"))
 print(f"Next raid check scheduled at {trigerAt} \n")
 
 # Schedule the script to run at a specific time
