@@ -49,7 +49,7 @@ def discord_factory(matchs) -> dict:
     """Create a discord message from the match."""
     # Create root message object
     message = {
-        "content": "RAID report",
+        "content": "RAID report: ",
         "embeds": []
     }
 
@@ -69,10 +69,12 @@ def discord_factory(matchs) -> dict:
 
         # Change the message according to the type
         if failedDisks:
+            message["content"] = message["content"] + f"{mountPoint}  :x: "
             embed["title"] = f"{mountPoint}  :x:"
             embed["description"] = f"Failed disks: {', '.join(failedDisks)}"
             embed["color"] = 16063773
         else:
+            message["content"] = message["content"] + f"{mountPoint} :white_check_mark: "
             embed["title"] = f"{mountPoint} RAID status :white_check_mark:"
             embed["description"] = "All disks are operational !"
             embed["color"] = 3126294
