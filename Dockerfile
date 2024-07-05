@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.13.0b2-slim
 
 # Crée un répertoire de travail dans l'image
 WORKDIR /app
