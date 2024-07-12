@@ -42,7 +42,7 @@ def get_match(mdstat_content, pattern) -> list:
     if matches:
         return matches
     else:
-        return None
+        return []
 
 
 def discord_factory(matchs) -> dict:
@@ -52,6 +52,11 @@ def discord_factory(matchs) -> dict:
         "content": "RAID report: ",
         "embeds": []
     }
+
+    # Check if matches is an empty list
+    if not matchs:
+        message["content"] += "No RAID disks found."
+        return message
 
     for match in matchs:
         # Get the content of the match
@@ -69,12 +74,12 @@ def discord_factory(matchs) -> dict:
 
         # Change the message according to the type
         if failedDisks:
-            message["content"] = message["content"] + f"{mountPoint}  :x: "
+            message["content"] = message["content"] + f"{mountPoint}:KO | "
             embed["title"] = f"{mountPoint}  :x:"
             embed["description"] = f"Failed disks: {', '.join(failedDisks)}"
             embed["color"] = 16063773
         else:
-            message["content"] = message["content"] + f"{mountPoint} :white_check_mark: "
+            message["content"] = message["content"] + f"{mountPoint}:OK | "
             embed["title"] = f"{mountPoint} RAID status :white_check_mark:"
             embed["description"] = "All disks are operational !"
             embed["color"] = 3126294
@@ -151,7 +156,9 @@ def main():
     # Generate the message
     discord_message = discord_factory(matches)
 
-    if raids_status:
+    if not matches:
+        print("No RAID disks found.")
+    elif raids_status:
         print("RAID status: OK")
     else:
         print("RAID status: KO")
