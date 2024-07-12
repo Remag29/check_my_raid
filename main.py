@@ -1,4 +1,6 @@
 import re
+import sys
+
 import requests
 import schedule
 import time
@@ -20,7 +22,7 @@ def read_mdstat_file(file_path) -> str:
             return file.read()
     except FileNotFoundError:
         print(f"The file {file_path} does not exist.")
-        exit(1)
+        sys.exit(1)
 
 
 def send_discord_notification(url, message_object) -> None:
