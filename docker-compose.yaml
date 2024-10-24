@@ -1,9 +1,6 @@
 services:
     checkmyraid:
-        image: checkmyraid
-        build:
-            context: .
-            dockerfile: Dockerfile
+        image: remag29/check_my_raid:latest
         volumes:
             - /proc/mdstat:/app/data/mdstat:ro
         env_file:
