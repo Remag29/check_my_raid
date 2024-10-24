@@ -1,7 +1,7 @@
 # Check My RAID
 
 A simple docker container that checks the status of a RAID array made with [mdadm](https://fr.wikipedia.org/wiki/Mdadm)
-and sends a notification with [NTFY](https://ntfy.sh/) of the status.
+and sends a notification with Discord of the status.
 
 ## Usage
 
@@ -11,9 +11,15 @@ Clone the repository and build the image with the following command:
 git clone https://github.com/Remag29/check_my_raid.git
 ```
 
+Make a copy of the `example.env` file:
+
 ```bash
-docker compose build
+cp example.env .env
 ```
+
+Edit the `.env` file and set the `DISCORD_WEBHOOK_URL` variable with the URL of your Discord webhook.
+
+Then build the image with the following command:
 
 ```bash
 docker compose up -d
@@ -22,28 +28,33 @@ docker compose up -d
 ## Docker compose
 
 ```yaml
+---
 services:
-  checkmyraid:
-    image: checkmyraid
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - /proc/mdstat:/app/data/mdstat:ro
-    env_file:
-      - .env
-    restart: unless-stopped
+    checkmyraid:
+        image: remag29/check_my_raid:latest
+        volumes:
+            - /proc/mdstat:/app/data/mdstat:ro
+        environment:
+            - TZ='Europe/Paris'
+            - CHECK_ON_STARTUP=False
+            - TRIGER_SCHEDULE_AT='12:00'
+            - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+        restart: unless-stopped
 ```
 
-Don't forget to create a .env file with the following content:
+Remember to create a .env file with the following content:
 
 ```env
-TZ=Europe/Paris
-CHECK_ON_STARTUP=False
-TRIGER_SCHEDULE_AT="12:00"
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/REDACTED/REDACTED
 ```
+## Variables
 
+| Variable              | Description                                                      | Default |
+|-----------------------|------------------------------------------------------------------|---------|
+| `TZ`                  | Timezone                                                         | `UTC`   |
+| `CHECK_ON_STARTUP`    | Check the status of the RAID array when the container is started | `None`  |
+| `TRIGER_SCHEDULE_AT`  | Time to check the status of the RAID array (format: HH:MM)       | `12:00` |
+| `DISCORD_WEBHOOK_URL` | URL of the Discord webhook                                       | `None`  |
 ## How it works
 
 The container is simply a python script that reads the /proc/mdstat to check the status of the RAID array.

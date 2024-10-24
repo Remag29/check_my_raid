@@ -1,3 +1,4 @@
+---
 services:
     checkmyraid:
         image: remag29/check_my_raid:latest
