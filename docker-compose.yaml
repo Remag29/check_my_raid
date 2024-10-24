@@ -3,4 +3,9 @@ services:
         image: remag29/check_my_raid:latest
         volumes:
             - /proc/mdstat:/app/data/mdstat:ro
+        environment:
+            - TZ='Europe/Paris'
+            - CHECK_ON_STARTUP=False
+            - TRIGER_SCHEDULE_AT='12:00'
+            - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
         restart: unless-stopped
