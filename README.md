@@ -38,7 +38,8 @@ services:
 Don't forget to create a .env file with the following content:
 
 ```env
-TZ=Europe/paris
+TZ=Europe/Paris
+CHECK_ON_STARTUP=False
 TRIGER_SCHEDULE_AT="12:00"
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/REDACTED/REDACTED
 ```
@@ -67,3 +68,6 @@ array is considered healthy, but if some "U" are replaced by "_", the RAID array
 The notification is sent with Discord Webhook. The URL of the webhook is set with the variable `DISCORD_WEBHOOK_URL`.
 
 The script is scheduled to run every day at a specific time set with the variable `TRIGER_SCHEDULE_AT`.
+
+You can also set the variable `CHECK_ON_STARTUP` to `True` to check the status of the RAID array when the container is
+started.

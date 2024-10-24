@@ -152,7 +152,7 @@ def main():
     # Search for the match in the mdstat file
     matches = get_match(mdstat_content, pattern)
 
-    # Get status of the RAID
+    # Get the status of the RAID
     raids_status = is_all_disks_ok(matches)
 
     # Generate the message
@@ -170,8 +170,10 @@ def main():
 
 
 #######################################################################################
-# Start the script 1 time on launch
-main()
+# Start the script 1 time if the variable CHECK_ON_STARTUP is set to True
+if os.getenv('CHECK_ON_STARTUP') == "True":
+    print("Checking RAID on startup of the container")
+    main()
 
 # Get the timezone and the schedule time
 timezone = os.getenv('TZ', 'UTC')
@@ -191,4 +193,4 @@ schedule.every().day.at(trigerAt, timezone).do(main)
 # Schedule loop
 while True:
     schedule.run_pending()
-    time.sleep(1)
+    time.sleep(10)
