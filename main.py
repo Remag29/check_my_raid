@@ -177,7 +177,7 @@ if os.getenv('CHECK_ON_STARTUP') == "True":
 
 # Get the timezone and the schedule time
 timezone = os.getenv('TZ', 'UTC')
-trigerAt = os.getenv('TRIGER_SCHEDULE_AT')
+trigerAt = os.getenv('TRIGER_SCHEDULE_AT', '12:00')
 
 # Get the current date and time on the timezone
 tz = pytz.timezone(timezone)
