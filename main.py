@@ -1,5 +1,7 @@
 import re
 import sys
+from dataclasses import field
+from typing import Tuple
 
 import requests
 import schedule
@@ -9,20 +11,58 @@ import pytz
 import os
 from dotenv import load_dotenv
 
+class Raid:
+    def __init__(self, name, disks):
+        self.name = name
+        self.state = 'KO'
+        self.disks = disks
+        self.disks_KO = []
+
+    def state_is_good(self) -> None:
+        self.state = 'OK'
+
 # Load environment variables from .env file
 load_dotenv()
 
 # Function ############################################################################
+def parse_raid_file(file_path):
+    raids = []
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    file.close()
 
+    line_index = 0
+    while line_index < len(lines):
+        line = lines[line_index].strip()
 
-def read_mdstat_file(file_path) -> str:
-    """Read the content of the mdstat file."""
-    try:
-        with open(file_path, "r") as file:
-            return file.read()
-    except FileNotFoundError:
-        print(f"The file {file_path} does not exist.")
-        sys.exit(1)
+        # Rechercher la ligne du RAID
+        raid_match = re.match(r'^(md\w+)\s*:\s*active\s+raid\d+\s+(.+)', line)
+        if raid_match:
+            raid = Raid(raid_match.group(1), raid_match.group(2).split())
+
+            # Passe à la ligne suivante pour les blocs et l'état
+            line_index += 1
+            state_line = lines[line_index].strip()
+
+            # Récupère l'état des disques (ex: [UUUU] pour tous les disques en état)
+            state_match = re.search(r'\[([U_]+)\]', state_line)
+            if state_match:
+                total_disks = len(state_match.group(1))
+                good_disks = state_match.group(1).count("U")
+
+                # Vérifier l'état des disques
+                if good_disks == total_disks:
+                    raid.state_is_good()
+                else:
+                    for index, disk in enumerate(state_match.group(1)):
+                        if disk == "_":
+                            raid.disks_KO.append(raid.disks[index])
+
+            raids.append(raid)
+
+        line_index += 1
+
+    return raids
 
 
 def send_discord_notification(url, message_object) -> None:
@@ -38,77 +78,58 @@ def send_discord_notification(url, message_object) -> None:
         print(f"Payload delivered successfully, code {response.status_code}.")
 
 
-def get_match(mdstat_content, pattern) -> list:
-    """Search for the match in the mdstat file."""
-    matches = re.findall(pattern, mdstat_content)
-    if matches:
-        return matches
-    else:
-        return []
-
-
-def discord_factory(matchs) -> dict:
+def discord_factory(raids):
     """Create a discord message from the match."""
     # Create root message object
+    problem_detected = None
     message = {
-        "content": "RAID report: ",
+        "content": "All Raids are good.\n---",
         "embeds": []
     }
 
     # Check if matches is an empty list
-    if not matchs:
-        message["content"] += "No RAID disks found."
-        return message
+    if not raids:
+        message["content"] += "No RAID disks found.\n---"
+        return message, True
 
-    for match in matchs:
-        # Get the content of the match
-        mountPoint, raidState, raidType, disksList, total, other, diskState, other2 = match
-
-        # Get failed disk
-        disks = disksList.split(" ")
-        failedDisks = []
-        for index, char in enumerate(diskState):
-            if char == "_":
-                failedDisks.append(disks[index])
-
+    for raid in raids:
         # Create the embed object
         embed = {}
 
         # Change the message according to the type
-        if failedDisks:
-            message["content"] = message["content"] + f"{mountPoint}:KO | "
-            embed["title"] = f"{mountPoint}  :x:"
-            embed["description"] = f"Failed disks: {', '.join(failedDisks)}"
+        if raid.state == "KO":
+            message["content"] = "A problem has been detected !\n---"
+            embed["title"] = f"{raid.name} :x:"
+            embed["description"] = f"At least one disks is down"
             embed["color"] = 16063773
-        else:
-            message["content"] = message["content"] + f"{mountPoint}:OK | "
-            embed["title"] = f"{mountPoint} RAID status :white_check_mark:"
+            problem_detected = True
+
+        elif raid.state == "OK":
+            embed["title"] = f"{raid.name} :white_check_mark:"
             embed["description"] = "All disks are operational !"
             embed["color"] = 3126294
+            problem_detected = False
 
-        # Add the informations
+        # Add the information
         embed["fields"] = [
             {
-                "name": "RAID type",
-                "value": raidType,
-                "inline": True
-            },
-            {
                 "name": "RAID state",
-                "value": raidState,
+                "value": raid.state,
                 "inline": True
             },
             {
                 "name": "Disks list",
-                "value": ', '.join(disks),
-                "inline": False
-            },
-            {
-                "name": "Total",
-                "value": total,
+                "value": ', '.join(raid.disks),
                 "inline": False
             }
         ]
+
+        if raid.disks_KO:
+            embed["fields"].append({
+                "name": "Failed disks list",
+                "value": ', '.join(raid.disks_KO),
+                "inline": False
+            })
 
         # Add footer
         embed["footer"] = {
@@ -121,20 +142,7 @@ def discord_factory(matchs) -> dict:
         # Add the embed to the message
         message["embeds"].append(embed)
 
-    return message
-
-
-def is_all_disks_ok(matchs) -> bool:
-    """Check if all disks are OK."""
-    for match in matchs:
-        # Get the content of the match
-        mountPoint, raidState, raidType, disksList, total, other, diskState, other2 = match
-
-        # Check if diskState contains "_"
-        if "_" in diskState:
-            return False
-
-    return True
+    return message, problem_detected
 
 
 def main():
@@ -144,26 +152,15 @@ def main():
     discord_url = os.getenv('DISCORD_WEBHOOK_URL')
 
     # Read the content of the mdstat file
-    mdstat_content = read_mdstat_file(mdstat_file)
-
-    # ReGex pattern
-    pattern = r"(\w+) : (\w+) (raid\d+) (.+)\n +(\d+) (.+) \[\d+\/\d+\] \[([U_]+)\]\n + \w+: \d+\/\d+ (.+)"
-
-    # Search for the match in the mdstat file
-    matches = get_match(mdstat_content, pattern)
-
-    # Get the status of the RAID
-    raids_status = is_all_disks_ok(matches)
+    raids = parse_raid_file(mdstat_file)
 
     # Generate the message
-    discord_message = discord_factory(matches)
+    discord_message, problem_detected = discord_factory(raids)
 
-    if not matches:
-        print("No RAID disks found.")
-    elif raids_status:
-        print("RAID status: OK")
+    if problem_detected:
+        print("Anomalies detected at least on one raid array.")
     else:
-        print("RAID status: KO")
+        print("All Raids are OK.")
 
     # Send the notification
     send_discord_notification(discord_url, discord_message)
